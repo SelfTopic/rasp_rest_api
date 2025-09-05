@@ -1,0 +1,10 @@
+services:
+  rasp-rest-api:
+    build: .
+    ports:
+      - "5500:5500"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    restart: unless-stopped
