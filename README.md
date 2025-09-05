@@ -18,7 +18,7 @@
 #### Клонируйте репозиторий:
 
 ```bash
-git clone <ваш-репозиторий>
+git clone https://github.com/SelfTopic/rasp_rest_api.git
 cd rasp_rest_api
 ```
 #### Запустите с помощью Docker Compose:
