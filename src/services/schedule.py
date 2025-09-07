@@ -19,9 +19,8 @@ class ScheduleParserService:
         self.group_name = group_name
 
     def find_group_schedule_url(self, group_number: str):
-        logger.debug("Method find_grou[_schedule_url is called")
+        logger.debug("Method find_group_schedule_url is called")
         try:
-
             logger.debug(f"Sending request to {self.url_parse_group}")
             response = requests.get(self.url_parse_group)
             response.encoding = 'windows-1251'  
@@ -33,7 +32,7 @@ class ScheduleParserService:
                 link_text = link.get_text(strip=True)
                 if group_number.lower() in link_text.lower():
                     if isinstance(link, Tag):
-                        return str(link.get("href"))
+                        return { "group_link": str(link.get("href")), "group_name": link_text }
                     else: 
                         logger.warning("Link has not a Tag type")
                         return None
@@ -45,7 +44,6 @@ class ScheduleParserService:
     def url_schedule(self, group_name: str) -> str:
         return f"https://portal.esstu.ru/bakalavriat/{group_name}"
 
-
     def parse_schedule(self) -> List[Dict[str, Any]] | None:
         group = self.find_group_schedule_url(self.group_name)
 
@@ -53,7 +51,7 @@ class ScheduleParserService:
             logger.warning("Group has not found")
             return None
         
-        url = self.url_schedule(group)
+        url = self.url_schedule(group['group_link'])
 
         logger.debug(f"Send request to {url}")
         response = requests.get(url)
@@ -70,11 +68,9 @@ class ScheduleParserService:
             return None 
         
         times = [td.get_text(strip=True) for td in time_row.find_all('td')[1:7]]
-        today = datetime.now(tz=timezone(timedelta(hours=8)))
-
-        day = today.day
-        index = day - 15
-        week = 1 if index / 2 <= 7 else 2
+        today = datetime.now()
+        
+        week_number = self.get_week_number(today)
 
         days_map = {
             'Пнд': 'Понедельник',
@@ -85,10 +81,9 @@ class ScheduleParserService:
             'Сбт': 'Суббота'
         }
 
-        week1 = []
+        schedule = []
 
         for row in soup.find_all('tr')[2:]:
-
             if not isinstance(row, Tag):
                 logger.warning(f"Object row has not type Tag")
                 return None 
@@ -98,7 +93,6 @@ class ScheduleParserService:
                 continue
                 
             day_cell = cells[0]
-
             if not isinstance(day_cell, Tag):
                 logger.warning("Object day cell has not type Tag")
                 return None
@@ -109,7 +103,6 @@ class ScheduleParserService:
             day_name = days_map.get(day_text, day_text)
             
             for i, cell in enumerate(cells[1:7]):
-
                 subject = cell.get_text(' ', strip=True)
                 if subject == '_' or not subject:
                     continue
@@ -120,16 +113,19 @@ class ScheduleParserService:
                     'subject': subject,
                     'week': 2 if is_week2 else 1
                 }
-                if week != pair_info['week']:
+                
+                if week_number != pair_info['week']:
                     continue
                 
-                week1.append(pair_info)
+                schedule.append(pair_info)
         
-        logger.debug(f"Week 1: {week1}")
-        return week1
+        logger.debug(f"Schedule: {schedule}")
+        return schedule
 
     def get_week_number(self, date: datetime):
         start_date = datetime(2023, 9, 1) 
+        if date.tzinfo is not None:
+            date = date.replace(tzinfo=None)
         delta = date - start_date
         week_num = (delta.days // 7) % 2 + 1
         return week_num
@@ -197,9 +193,9 @@ class ScheduleParserService:
         return image
 
     def get_today_tomorrow_schedule(self):
-        week1 = self.parse_schedule()
+        schedule = self.parse_schedule()
 
-        if not week1:
+        if not schedule:
             logger.warning("Object week has not found")
             return None
         
@@ -213,15 +209,8 @@ class ScheduleParserService:
         today_name = days[today.weekday()]
         tomorrow_name = days[tomorrow.weekday()]
         
-        if current_week == 1:
-            today_schedule = [p for p in week1 if p['day'] == today_name]
-        else:
-            today_schedule = [p for p in week1 if p['day'] == today_name]
-        
-        if tomorrow_week == 1:
-            tomorrow_schedule = [p for p in week1 if p['day'] == tomorrow_name]
-        else:
-            tomorrow_schedule = [p for p in week1 if p['day'] == tomorrow_name]
+        today_schedule = [p for p in schedule if p['day'] == today_name and p['week'] == current_week]
+        tomorrow_schedule = [p for p in schedule if p['day'] == tomorrow_name and p['week'] == tomorrow_week]
         
         def time_key(pair):
             return pair['time']
@@ -232,7 +221,6 @@ class ScheduleParserService:
         return today_schedule, tomorrow_schedule, today, tomorrow
 
     def generate_schedule_images(self):
-
         result = self.get_today_tomorrow_schedule()
         if not result:
             logger.debug("Object result not found")
@@ -251,7 +239,6 @@ class ScheduleParserService:
 
 
 if __name__ == '__main__':
-
     group = "Б735"
     schedule_parser = ScheduleParserService(group_name=group)
     images_names = schedule_parser.generate_schedule_images()
