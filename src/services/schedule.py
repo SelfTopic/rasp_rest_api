@@ -209,7 +209,7 @@ class ScheduleParserService:
         current_week = self.get_week_number(today)
         tomorrow_week = self.get_week_number(tomorrow)
         
-        days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+        days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
         today_name = days[today.weekday()]
         tomorrow_name = days[tomorrow.weekday()]
         
